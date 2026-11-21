@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Boulka Chrono</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%2315181e'/><circle cx='32' cy='37' r='20' fill='%23ff6b4a'/><ellipse cx='25' cy='30' rx='4' ry='6' fill='%23ffffff' opacity='.25' transform='rotate(25 25 30)'/><path d='M32 20c-5-7-13-5-16 0 6-1 10 0 16 3 6-3 10-4 16-3-3-5-11-7-16 0z' fill='%234fd1a1'/><path d='M32 9v12' stroke='%234fd1a1' stroke-width='3.5' stroke-linecap='round'/></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#15181e; --accent:#ff6b4a; --ink:#eef1f5; --soft:rgba(238,241,245,.10); --line:rgba(238,241,245,.22);
+  --card:#1e232b; --card-ink:#eef1f5; --muted:#9aa3b2;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+:root[data-mode="pause"]{ --accent:#4fd1a1; }
+:root[data-mode="longue"]{ --accent:#6ea8ff; }
+*{box-sizing:border-box}
+html{min-height:100%; background:var(--bg); }
+body{
+  margin:0; min-height:100vh; background:var(--bg); color:var(--ink);
+  font-family:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+main{max-width:520px; margin:0 auto; padding:28px 20px 48px}
+h1{font-size:1.6rem; font-weight:800; margin:0; letter-spacing:-.02em}
+header{display:flex; justify-content:space-between; align-items:center; gap:12px}
+.stats{font-size:.9rem; opacity:.9; margin-top:6px}
+.modes{display:flex; gap:6px; margin:20px 0 10px}
+.modes span{flex:1; text-align:center; padding:9px 4px; border-radius:999px; border:1.5px solid var(--line); font-weight:600; font-size:.9rem; opacity:.6}
+.modes span.on{background:var(--accent); color:var(--bg); border-color:var(--accent); opacity:1}
+.dial{position:relative; width:min(78vw,320px); aspect-ratio:1; margin:18px auto}
+.dial svg{width:100%; height:100%; transform:rotate(-90deg)}
+.dial circle{fill:none; stroke-width:10}
+.track{stroke:var(--soft)}
+.prog{stroke:var(--accent); stroke-linecap:round; transition:stroke-dashoffset .4s linear}
+.time{position:absolute; inset:0; display:grid; place-content:center; text-align:center}
+.time b{font-size:clamp(3.4rem,17vw,5rem); font-weight:800; letter-spacing:-.03em; font-variant-numeric:tabular-nums; line-height:1}
+.time small{margin-top:6px; font-size:1rem; opacity:.85}
+.current{text-align:center; margin:0 0 18px; min-height:1.4em; opacity:.9}
+.btns{display:flex; justify-content:center; gap:10px; flex-wrap:wrap}
+button{font:inherit; cursor:pointer}
+.main-btn{background:var(--accent); color:var(--bg); border:0; border-radius:999px; padding:14px 38px; font-weight:800; font-size:1.1rem; min-width:150px}
+.sec-btn{background:transparent; color:var(--ink); border:1.5px solid var(--line); border-radius:999px; padding:12px 18px; font-weight:600}
+button:focus-visible,input:focus-visible{outline:3px solid var(--accent); outline-offset:3px}
+.tasks{margin-top:34px; background:var(--card); color:var(--card-ink); border-radius:20px; padding:20px; border:1px solid var(--line)}
+.tasks h2{margin:0 0 4px; font-size:1.2rem}
+.count{color:var(--muted); font-size:.9rem; margin-bottom:14px}
+.add{display:flex; gap:8px}
+.add input[type=text]{flex:1; min-width:0}
+.add input{font:inherit; padding:11px 12px; border-radius:12px; border:1.5px solid var(--line); background:transparent; color:inherit}
+.add input[type=number]{width:62px}
+.add button{background:var(--accent); color:var(--bg); border:0; border-radius:12px; padding:0 16px; font-weight:600}
+.hint{color:var(--muted); font-size:.85rem; margin:8px 0 0}
+ul{list-style:none; margin:14px 0 0; padding:0}
+li{display:flex; align-items:center; gap:10px; padding:11px 0 11px 10px; border-top:1px solid var(--line); border-left:4px solid transparent}
+li.active{border-left-color:var(--accent); background:var(--soft)}
+li input{width:22px; height:22px; accent-color:var(--accent); flex:none}
+.pick{flex:1; text-align:left; background:none; border:0; color:inherit; padding:2px 0; overflow-wrap:anywhere}
+li.done .pick{text-decoration:line-through; color:var(--muted)}
+.est{color:var(--muted); font-size:.9rem; white-space:nowrap}
+li .del{background:none; border:0; color:var(--muted); font-size:1.3rem; padding:2px 8px}
+.empty{color:var(--muted); padding:14px 0 2px}
+.clear{margin-top:12px; background:none; border:0; color:var(--muted); text-decoration:underline; padding:0}
+/* Mode classe : plein écran */
+body.fs main{max-width:none; padding-top:3vh}
+body.fs .dial{width:min(64vh,90vw)}
+body.fs .time b{font-size:clamp(4rem,20vh,12rem)}
+body.fs .tasks{display:none}
+body.fs .current{font-size:1.4rem}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Boulka Chrono</h1>
+      <div class="stats" id="stats"></div>
+    </div>
+    <button class="sec-btn" id="fs">Plein écran</button>
+  </header>
+
+  <div class="modes" aria-hidden="true">
+    <span id="m-travail" class="on">Travail 25 min</span>
+    <span id="m-pause">Pause 5 min</span>
+    <span id="m-longue">Longue pause 15 min</span>
+  </div>
+
+  <div class="dial" role="timer" aria-live="off">
+    <svg viewBox="0 0 120 120">
+      <circle class="track" cx="60" cy="60" r="54"/>
+      <circle class="prog" id="prog" cx="60" cy="60" r="54"/>
+    </svg>
+    <div class="time"><b id="time">25:00</b><small id="label">Au travail !</small></div>
+  </div>
+
+  <p class="current" id="current"></p>
+
+  <div class="btns">
+    <button class="main-btn" id="start">Démarrer</button>
+    <button class="sec-btn" id="reset">Remettre à zéro</button>
+    <button class="sec-btn" id="skip">Passer</button>
+  </div>
+
+  <section class="tasks">
+    <h2>Tâches à accomplir</h2>
+    <div class="count" id="count"></div>
+    <div class="add">
+      <input id="newTask" type="text" placeholder="Ex. : corriger les copies de 3e B" maxlength="120" aria-label="Nouvelle tâche">
+      <input id="newEst" type="number" min="1" max="12" value="1" aria-label="Nombre de pomodoros prévus" title="Nombre de pomodoros prévus">
+      <button id="addBtn">Ajouter</button>
+    </div>
+    <p class="hint">Le nombre à droite = pomodoros prévus. Clique sur une tâche pour la choisir : chaque pomodoro terminé lui sera compté.</p>
+    <ul id="list"></ul>
+    <button class="clear" id="clearDone" hidden>Supprimer les tâches terminées</button>
+  </section>
+</main>
+
+<script>
+(function(){
+  var DUR = {travail:25*60, pause:5*60, longue:15*60};
+  var CYCLE = 6; // longue pause après 6 pomodoros
+  var mode = "travail", left = DUR.travail, running = false, endAt = 0, tick = null;
+  var C = 2*Math.PI*54;
+  var $ = function(id){return document.getElementById(id)};
+  var prog = $("prog"); prog.style.strokeDasharray = C;
+
+  function load(k, d){ try{ var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } }
+  function save(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+
+  var tasks = load("boulka-tasks", []);
+  var activeId = load("boulka-active", null);
+  var today = new Date().toDateString();
+  var stats = load("boulka-stats", {day:today, n:0, streak:0});
+  if(stats.day !== today) stats = {day:today, n:0, streak:0};
+
+  function fmt(s){ var m = Math.floor(s/60), r = s%60; return String(m).padStart(2,"0")+":"+String(r).padStart(2,"0"); }
+  function activeTask(){ return tasks.filter(function(t){return t.id===activeId})[0]; }
+
+  function render(){
+    $("time").textContent = fmt(left);
+    prog.style.strokeDashoffset = C * (1 - left/DUR[mode]);
+    document.documentElement.dataset.mode = mode;
+    ["travail","pause","longue"].forEach(function(m){ $("m-"+m).className = mode===m ? "on" : ""; });
+    var idle = {travail:"Au travail !", pause:"Place à la pause", longue:"Place à la longue pause"};
+    var busy = {travail:"Concentration", pause:"Pause en cours", longue:"Longue pause en cours"};
+    $("label").textContent = running ? busy[mode] : idle[mode];
+    $("start").textContent = running ? "Pause" : (left < DUR[mode] ? "Reprendre" : "Démarrer");
+    $("stats").textContent = stats.n + (stats.n>1 ? " pomodoros terminés" : " pomodoro terminé") + " aujourd’hui · série " + stats.streak + "/" + CYCLE;
+    var t = activeTask();
+    $("current").textContent = t ? "Tâche en cours : " + t.text : "";
+    document.title = (running ? fmt(left)+" · " : "") + "Boulka Chrono";
+  }
+
+  function beep(){
+    try{
+      var ctx = new (window.AudioContext||window.webkitAudioContext)();
+      [0,.25,.5].forEach(function(t){
+        var o = ctx.createOscillator(), g = ctx.createGain();
+        o.frequency.value = 880; o.connect(g); g.connect(ctx.destination);
+        g.gain.setValueAtTime(.25, ctx.currentTime+t);
+        g.gain.exponentialRampToValueAtTime(.001, ctx.currentTime+t+.2);
+        o.start(ctx.currentTime+t); o.stop(ctx.currentTime+t+.2);
+      });
+    }catch(e){}
+  }
+
+  function stop(){ running = false; clearInterval(tick); }
+
+  function goTo(next, autoStart){
+    stop(); mode = next; left = DUR[mode];
+    if(autoStart) start(); else render();
+  }
+
+  // Un pomodoro vient d'être terminé : compter, puis choisir la pause
+  function pomodoroDone(){
+    stats.n++; stats.streak++;
+    var t = activeTask();
+    if(t){
+      t.count = (t.count||0) + 1;
+      if(t.count >= t.est){ t.done = true; activeId = null; save("boulka-active", activeId); }
+      save("boulka-tasks", tasks); renderTasks();
+    }
+    var longBreak = stats.streak >= CYCLE;
+    if(longBreak) stats.streak = 0;
+    save("boulka-stats", stats);
+    return longBreak ? "longue" : "pause";
+  }
+
+  function start(){
+    running = true;
+    endAt = Date.now() + left*1000;
+    clearInterval(tick);
+    tick = setInterval(function(){
+      left = Math.max(0, Math.round((endAt - Date.now())/1000));
+      if(left === 0){
+        beep();
+        goTo(mode==="travail" ? pomodoroDone() : "travail", true);
+      } else render();
+    }, 250);
+    render();
+  }
+
+  function toggle(){ if(running){ stop(); render(); } else start(); }
+  $("start").onclick = toggle;
+  $("reset").onclick = function(){ stop(); left = DUR[mode]; render(); };
+  $("skip").onclick = function(){ goTo(mode==="travail" ? "pause" : "travail", false); };
+
+  document.addEventListener("keydown", function(e){
+    if(e.code==="Space" && !/INPUT|BUTTON|TEXTAREA/.test(document.activeElement.tagName)){ e.preventDefault(); toggle(); }
+  });
+
+  // Plein écran
+  $("fs").onclick = function(){
+    if(document.fullscreenElement){ document.exitFullscreen(); }
+    else if(document.documentElement.requestFullscreen){ document.documentElement.requestFullscreen(); }
+    else { document.body.classList.toggle("fs"); }
+  };
+  document.addEventListener("fullscreenchange", function(){
+    var on = !!document.fullscreenElement;
+    document.body.classList.toggle("fs", on);
+    $("fs").textContent = on ? "Quitter le plein écran" : "Plein écran";
+  });
+
+  function renderTasks(){
+    var ul = $("list"); ul.innerHTML = "";
+    if(!tasks.length){
+      var e = document.createElement("div"); e.className = "empty";
+      e.textContent = "Aucune tâche. Écris la première ci-dessus.";
+      ul.appendChild(e);
+    }
+    tasks.forEach(function(t, i){
+      var li = document.createElement("li");
+      if(t.done) li.className = "done";
+      if(t.id === activeId) li.className += " active";
+      var cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = t.done;
+      cb.setAttribute("aria-label", "Terminer : " + t.text);
+      cb.onchange = function(){ t.done = cb.checked; if(t.done && activeId===t.id){ activeId = null; save("boulka-active", activeId); } save("boulka-tasks", tasks); renderTasks(); render(); };
+      var pick = document.createElement("button"); pick.className = "pick"; pick.textContent = t.text;
+      pick.setAttribute("aria-pressed", t.id===activeId);
+      pick.title = "Choisir cette tâche pour les prochains pomodoros";
+      pick.onclick = function(){ activeId = (activeId===t.id) ? null : t.id; save("boulka-active", activeId); renderTasks(); render(); };
+      var est = document.createElement("span"); est.className = "est"; est.textContent = "🍅 " + (t.count||0) + "/" + t.est;
+      var x = document.createElement("button"); x.className = "del"; x.textContent = "×"; x.setAttribute("aria-label", "Supprimer : " + t.text);
+      x.onclick = function(){ if(activeId===t.id){ activeId = null; save("boulka-active", activeId); } tasks.splice(i,1); save("boulka-tasks", tasks); renderTasks(); render(); };
+      li.append(cb, pick, est, x); ul.appendChild(li);
+    });
+    var rest = tasks.filter(function(t){return !t.done}).length;
+    $("count").textContent = tasks.length ? rest + " à faire sur " + tasks.length : "";
+    $("clearDone").hidden = !tasks.some(function(t){return t.done});
+  }
+
+  function addTask(){
+    var v = $("newTask").value.trim(); if(!v) return;
+    var est = Math.min(12, Math.max(1, parseInt($("newEst").value,10) || 1));
+    var t = {id:Date.now(), text:v, est:est, count:0, done:false};
+    tasks.push(t);
+    if(activeId === null){ activeId = t.id; save("boulka-active", activeId); }
+    save("boulka-tasks", tasks);
+    $("newTask").value = ""; $("newEst").value = 1;
+    renderTasks(); render(); $("newTask").focus();
+  }
+  $("addBtn").onclick = addTask;
+  $("newTask").addEventListener("keydown", function(e){ if(e.key==="Enter") addTask(); });
+  $("clearDone").onclick = function(){ tasks = tasks.filter(function(t){return !t.done}); save("boulka-tasks", tasks); renderTasks(); };
+
+  render(); renderTasks();
+})();
+</script>
+</body>
+</html>
