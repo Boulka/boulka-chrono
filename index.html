@@ -26,6 +26,9 @@ main{max-width:520px; margin:0 auto; padding:28px 20px 48px}
 h1{font-size:1.6rem; font-weight:800; margin:0; letter-spacing:-.02em}
 header{display:flex; justify-content:space-between; align-items:center; gap:12px}
 .stats{font-size:.9rem; opacity:.9; margin-top:6px}
+.profiles{display:flex; gap:6px; margin-top:18px; padding:4px; background:var(--soft); border-radius:999px}
+.profiles button{flex:1; border:0; border-radius:999px; padding:10px; background:transparent; color:var(--ink); font-weight:600}
+.profiles button[aria-pressed="true"]{background:var(--ink); color:var(--bg)}
 .modes{display:flex; gap:6px; margin:20px 0 10px}
 .modes span{flex:1; text-align:center; padding:9px 4px; border-radius:999px; border:1.5px solid var(--line); font-weight:600; font-size:.9rem; opacity:.6}
 .modes span.on{background:var(--accent); color:var(--bg); border-color:var(--accent); opacity:1}
@@ -81,6 +84,11 @@ body.fs .current{font-size:1.4rem}
     <button class="sec-btn" id="fs">Plein écran</button>
   </header>
 
+  <div class="profiles" role="group" aria-label="Type de séance">
+    <button id="p-cours" aria-pressed="true">Mode cours</button>
+    <button id="p-exercice" aria-pressed="false">Mode exercice</button>
+  </div>
+
   <div class="modes" aria-hidden="true">
     <span id="m-travail" class="on">Travail 25 min</span>
     <span id="m-pause">Pause 5 min</span>
@@ -119,9 +127,12 @@ body.fs .current{font-size:1.4rem}
 
 <script>
 (function(){
-  var DUR = {travail:25*60, pause:5*60, longue:15*60};
-  var CYCLE = 6; // longue pause après 6 pomodoros
-  var mode = "travail", left = DUR.travail, running = false, endAt = 0, tick = null;
+  var PROFILES = {
+    cours:    {travail:25, pause:5,  longue:15, cycle:4},
+    exercice: {travail:45, pause:10, longue:20, cycle:3}
+  };
+  var DUR = {}, CYCLE = 4, profile = "cours";
+  var mode = "travail", left = 0, running = false, endAt = 0, tick = null;
   var C = 2*Math.PI*54;
   var $ = function(id){return document.getElementById(id)};
   var prog = $("prog"); prog.style.strokeDasharray = C;
@@ -135,6 +146,15 @@ body.fs .current{font-size:1.4rem}
   var stats = load("boulka-stats", {day:today, n:0, streak:0});
   if(stats.day !== today) stats = {day:today, n:0, streak:0};
 
+  function applyProfile(name){
+    profile = PROFILES[name] ? name : "cours";
+    var p = PROFILES[profile];
+    DUR = {travail:p.travail*60, pause:p.pause*60, longue:p.longue*60};
+    CYCLE = p.cycle;
+  }
+  applyProfile(load("boulka-profile", "cours"));
+  left = DUR.travail;
+
   function fmt(s){ var m = Math.floor(s/60), r = s%60; return String(m).padStart(2,"0")+":"+String(r).padStart(2,"0"); }
   function activeTask(){ return tasks.filter(function(t){return t.id===activeId})[0]; }
 
@@ -142,7 +162,12 @@ body.fs .current{font-size:1.4rem}
     $("time").textContent = fmt(left);
     prog.style.strokeDashoffset = C * (1 - left/DUR[mode]);
     document.documentElement.dataset.mode = mode;
-    ["travail","pause","longue"].forEach(function(m){ $("m-"+m).className = mode===m ? "on" : ""; });
+    var names = {travail:"Travail", pause:"Pause", longue:"Longue pause"};
+    ["travail","pause","longue"].forEach(function(m){
+      $("m-"+m).className = mode===m ? "on" : "";
+      $("m-"+m).textContent = names[m] + " " + (DUR[m]/60) + " min";
+    });
+    ["cours","exercice"].forEach(function(n){ $("p-"+n).setAttribute("aria-pressed", profile===n); });
     var idle = {travail:"Au travail !", pause:"Place à la pause", longue:"Place à la longue pause"};
     var busy = {travail:"Concentration", pause:"Pause en cours", longue:"Longue pause en cours"};
     $("label").textContent = running ? busy[mode] : idle[mode];
@@ -204,6 +229,15 @@ body.fs .current{font-size:1.4rem}
 
   function toggle(){ if(running){ stop(); render(); } else start(); }
   $("start").onclick = toggle;
+  function setProfile(name){
+    if(name === profile) return;
+    if(running && !confirm("Changer de mode remet le minuteur à zéro. Continuer ?")) return;
+    stop(); applyProfile(name); save("boulka-profile", profile);
+    stats.streak = 0; save("boulka-stats", stats);
+    mode = "travail"; left = DUR.travail; render();
+  }
+  $("p-cours").onclick = function(){ setProfile("cours"); };
+  $("p-exercice").onclick = function(){ setProfile("exercice"); };
   $("reset").onclick = function(){ stop(); left = DUR[mode]; render(); };
   $("skip").onclick = function(){ goTo(mode==="travail" ? "pause" : "travail", false); };
 
@@ -241,7 +275,7 @@ body.fs .current{font-size:1.4rem}
       pick.setAttribute("aria-pressed", t.id===activeId);
       pick.title = "Choisir cette tâche pour les prochains pomodoros";
       pick.onclick = function(){ activeId = (activeId===t.id) ? null : t.id; save("boulka-active", activeId); renderTasks(); render(); };
-      var est = document.createElement("span"); est.className = "est"; est.textContent = "🍅 " + (t.count||0) + "/" + t.est;
+      var est = document.createElement("span"); est.className = "est"; est.title = "Pomodoros faits / prévus"; est.textContent = (t.count||0) + "/" + t.est;
       var x = document.createElement("button"); x.className = "del"; x.textContent = "×"; x.setAttribute("aria-label", "Supprimer : " + t.text);
       x.onclick = function(){ if(activeId===t.id){ activeId = null; save("boulka-active", activeId); } tasks.splice(i,1); save("boulka-tasks", tasks); renderTasks(); render(); };
       li.append(cb, pick, est, x); ul.appendChild(li);
